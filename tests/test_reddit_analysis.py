@@ -1,16 +1,9 @@
-from reddit_analysis import AggregateTickerData, sort_aggregate_data_by_count
+from reddit_analysis import sort_aggregate_data_by_count
 
 
-def test_sort_aggregate_data_by_count_sorts_list():
-    agg_data = [
-        AggregateTickerData(ticker="AAPL", count=10),
-        AggregateTickerData(ticker="TSLA", count=1000),
-        AggregateTickerData(ticker="SPCE", count=50),
-        AggregateTickerData(ticker="GME", count=30000)
-    ]
-    sort_aggregate_data_by_count(agg_data)
+def test_sort_aggregate_data_by_count_sorts_list(aggregate_data_list):
+    agg_data = aggregate_data_list
+    sort_aggregate_data_by_count(aggregate_data_list)
 
-    assert agg_data[0].ticker is "GME"
-    assert agg_data[1].ticker is "TSLA"
-    assert agg_data[2].ticker is "SPCE"
-    assert agg_data[3].ticker is "AAPL"
+    for i in range(len(agg_data) - 1):
+        assert agg_data[i].count > agg_data[i + 1].count
