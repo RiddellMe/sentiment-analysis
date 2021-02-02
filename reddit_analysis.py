@@ -15,6 +15,8 @@ from utils.timer import Timer
 _PUSHSHIFT_COMMENT_API = "https://api.pushshift.io/reddit/search/comment/"
 _TICKER_FILES = ["ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt",
                  "ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt"]
+# Number of times to retry calling the API if call fails
+_API_RETRY_ATTEMPTS = 10
 # How much karma the comment should have to be included in search
 _KARMA_THRESHOLD = 3
 # 100 is upper limit of search results. Do not increase above 100
@@ -30,6 +32,7 @@ logger = logging.getLogger(__name__)
 class AggregateTickerData(BaseModel):
     ticker: str
     count: int
+    failed_during_fetch: Optional[bool]
 
 
 def aggregate_ticker_comment_count(ticker_list: List[str], days_to_look_back: int = 1,
@@ -57,6 +60,7 @@ def aggregate_ticker_comment_count(ticker_list: List[str], days_to_look_back: in
                 logger.info(f"Analyzed {completed} tickers. Elapsed time: {int(timer.get_elapsed_time())} seconds")
             logger.debug(
                 f"Found {count} mentions of {aggregate_data.ticker} with at least {_KARMA_THRESHOLD} karma over the last {days_to_look_back} day(s).")
+    sort_aggregate_data_by_count(aggregate_data_list)
     logger.info(aggregate_data_list)
     logger.info(f"Analyzed {len(ticker_list)} tickers in {timer.end()} seconds.")
     return aggregate_data_list
@@ -73,7 +77,7 @@ def filter_comments_with_no_karma(comment_list: List[Dict]) -> int:
 def count_ticker_comments(ticker: str, from_date: datetime, subreddit_to_search: Optional[str]) -> AggregateTickerData:
     # Turn datetime into unix timestamp with no milliseconds
     from_timestamp = int(from_date.timestamp())
-    number_upvoted_comments = 0
+    aggregate_data = AggregateTickerData(ticker=ticker, count=0)
     with requests.Session() as session:
         more_iterations_available = True
         while more_iterations_available:
@@ -82,32 +86,42 @@ def count_ticker_comments(ticker: str, from_date: datetime, subreddit_to_search:
             if subreddit_to_search:
                 search_params += f"&subreddit={subreddit_to_search}"
             api_call = os.path.join(_PUSHSHIFT_COMMENT_API, search_params)
-            for retry_attempt in range(10):
-                bad_status_code = False
-                resp = session.get(api_call)
-                # Ensure these commonly encountered error codes are re-requested
-                if resp.status_code in [429, 522, 525]:
-                    logger.warning(f"Error occurred during call to: {api_call}.\n"
-                                   f"Status code: {resp.status_code}\n"
-                                   f"Sleeping for {_SECONDS_TO_SLEEP_BEFORE_NEW_REQUEST} seconds.")
-                    sleep(_SECONDS_TO_SLEEP_BEFORE_NEW_REQUEST)
-                else:
-                    try:
-                        content: List[Dict] = json.loads(resp.text).get("data")
-                        break
-                    except Exception as e:
-                        logger.exception(f"Unexpected exception occurred.\n"
-                                         f"STATUS CODE: {resp.status_code}\n"
-                                         f"API CALL: {api_call}\n"
-                                         f"RESPONSE TEXT: {resp.text}")
-                        raise e
+            content = get_comments_from_api(session, api_call, aggregate_data)
             if not content or len(content) < _API_SEARCH_RESULT_SIZE:
                 more_iterations_available = False
             else:
                 from_timestamp = content[_API_SEARCH_RESULT_SIZE - 1].get("created_utc")
-            number_upvoted_comments += filter_comments_with_no_karma(content)
+            aggregate_data.count += filter_comments_with_no_karma(content)
 
-    return AggregateTickerData(ticker=ticker, count=number_upvoted_comments)
+    return aggregate_data
+
+
+def get_comments_from_api(session: requests.Session, api_call: str, aggregate_data: AggregateTickerData) -> List[Dict]:
+    content: List[Dict] = []
+    for retry_attempt in range(_API_RETRY_ATTEMPTS):
+        resp = session.get(api_call)
+        # Ensure we retry calling api when response is an error code
+        if resp.status_code != 200:
+            logger.debug(f"Error occurred during call to: {api_call}.\n"
+                           f"Status code: {resp.status_code}\n"
+                           f"Sleeping for {_SECONDS_TO_SLEEP_BEFORE_NEW_REQUEST} seconds.")
+            sleep(_SECONDS_TO_SLEEP_BEFORE_NEW_REQUEST)
+            if retry_attempt is _API_RETRY_ATTEMPTS - 1:
+                aggregate_data.failed_during_fetch = True
+                logger.warning(
+                    f"{api_call} failed too many times in a row."
+                    f"Could not continue fetching data for {aggregate_data.ticker}.")
+        else:
+            try:
+                content = json.loads(resp.text).get("data")
+                break
+            except Exception as e:
+                logger.exception(f"Unexpected exception occurred.\n"
+                                 f"STATUS CODE: {resp.status_code}\n"
+                                 f"API CALL: {api_call}\n"
+                                 f"RESPONSE TEXT: {resp.text}")
+                raise e
+    return content
 
 
 def get_list_of_tickers() -> List[str]:
@@ -130,6 +144,10 @@ def get_list_of_tickers() -> List[str]:
                         ticker_list.append(ticker)
     logger.info(f"Sourced {len(ticker_list)} tickers")
     return ticker_list
+
+
+def sort_aggregate_data_by_count(data: List[AggregateTickerData]):
+    data.sort(key=lambda x: x.count, reverse=True)
 
 
 if __name__ == "__main__":
