@@ -1,5 +1,11 @@
 # Sentiment analysis
 
+#### Requirements:
+
+* Written using Python3.8*
+
+*TensorFlow not supported on Python3.9
+
 #### Purpose:
 
 Scrape subreddit(s) and aggregate the number of times a ticker was mentioned in a specified timeframe
@@ -10,14 +16,17 @@ Scrape subreddit(s) and aggregate the number of times a ticker was mentioned in 
 * Can specify a subreddit
 * Can search through ALL subreddits
 * Can specify a to date, and how many previous days to gather information
-* Returns a list of mentions and related ticker in descending order
+* Returns a DTO containing a list of tickers and their mention count in descending order, as well as a from date and to date
 * Creates CSV with output data
 * Utilizes the pushshift.io API
-* Multi-threaded environment to make API calls more efficient
-* Includes a custom timer utility
+* Multi-threaded environment for speed
+* Can conduct sentiment analysis using a Naive Bayes classifier. Weighting schemes supported:
+    - raw word count
+    - term frequency
+    - tf-idf (term frequency-inverse document frequency)
 
 #### TODO: 
-* Keyword aggregation in top mentioned stocks to forecast price movements. Simple keyword search or ML techniques? porque no los dos?
+* Implement other classification techniques (LSTM for example)
+* Model the sentiment in terms of price movements/volatility/options prices/implied volatility within 1/3/5/14/30 days (correlation anaylsis/regression) and backtest
 * Data visualization
-* Back-test and show impact of mentions on price movements/volatility/options prices/implied volatility within 1/3/5/14/30 days (correlation anaylsis/regression)
 
