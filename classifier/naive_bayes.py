@@ -60,7 +60,7 @@ class NaiveBayes:
         and filtered alphanumeric comment for calculating the log likelihood"""
         for comment in documents:
             # remove apostrophes before preprocessing
-            comment = comment.lower().replace("'", "")
+            comment = comment.lower().replace("’", "").replace("'", "")
             processed_comment = comment
             if self.filters:
                 for string in self.filters:
