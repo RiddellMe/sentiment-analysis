@@ -5,7 +5,9 @@ from concurrent import futures
 from enum import Enum
 from typing import List
 
+import nltk
 import numpy as np
+from num2words import num2words
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -36,11 +38,13 @@ class NaiveBayes:
     negative_class: DocumentClass
     positive_class: DocumentClass
     test_results: ClassificationDTO
+    lemmatizer = nltk.WordNetLemmatizer()
 
     def __init__(self, add_alpha_smoothing: int = 1, words_to_ignore: List[str] = None):
         """words_to_ignore are removed from the comments in the pre processing stage"""
         self.filters = words_to_ignore
         self._ADD_ALPHA_SMOOTHING = add_alpha_smoothing
+        nltk.download('wordnet')  # wordnet is used for lemmatizing words
 
     class Mode(Enum):
         COUNT = "count"
@@ -56,11 +60,19 @@ class NaiveBayes:
         """yield unfiltered alphanumeric comment for comment integrity and readability when returning comment,
         and filtered alphanumeric comment for calculating the log likelihood"""
         for comment in documents:
-            lowercase_comment = comment.lower()
+            # remove apostrophes before preprocessing
+            comment = comment.lower().replace("'", "")
+            processed_comment = comment
             if self.filters:
                 for string in self.filters:
-                    lowercase_comment = lowercase_comment.replace(string.lower(), "")
-            yield self.regex.sub(' ', comment).strip(), self.regex.sub(' ', lowercase_comment).strip()
+                    processed_comment = processed_comment.replace(string.lower(), "")
+            # split comment into list of words, lemmatize words, convert numbers into string, convert back to comment
+            word_list = processed_comment.split(' ')
+            for i, word in enumerate(word_list):
+                if word.isdigit():
+                    word_list[i] = num2words(word)
+            processed_comment = ' '.join([self.lemmatizer.lemmatize(word) for word in word_list])
+            yield self.regex.sub(' ', comment).strip(), self.regex.sub(' ', processed_comment).strip()
 
     def calculate_word_weights(self, documents: List[str], df, tf_mode: Mode):
         """Used to calculate word weights. tf_mode is the weighting scheme used on the frequency term.

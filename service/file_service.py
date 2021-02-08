@@ -29,6 +29,7 @@ def write_comment_sentiment_to_csv(data: List[ClassificationData], ticker: str):
 
 
 def read_csv(file_name: str):
+    """ASCII encoding required"""
     with open(file_name, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
