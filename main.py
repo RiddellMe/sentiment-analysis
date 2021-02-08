@@ -17,7 +17,7 @@ def count_stock_tickers():
 
 
 def naive_bayes_sentiment_analysis():
-    ticker = "AAPL"
+    ticker = "PLTR"
     subreddit = "wallstreetbets"
     prev_day_count = 4
     comments = ticker_service.get_ticker_comments(ticker, prev_day_count, subreddit)
@@ -26,7 +26,7 @@ def naive_bayes_sentiment_analysis():
     training_data = naive_bayes.convert_from_list(training_data_list)
     naive_bayes.train(training_data)
     data = naive_bayes.test(comments)
-    file_service.write_comment_sentiment_to_csv(data, ticker)
+    file_service.write_comment_sentiment_to_csv(data.classification_list, ticker)
 
 
 if __name__ == "__main__":

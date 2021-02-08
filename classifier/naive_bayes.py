@@ -22,6 +22,12 @@ class DocumentClass(BaseModel):
     log_likelihood = {}
 
 
+class ClassificationDTO(BaseModel):
+    positive_count: int = 0
+    negative_count: int = 0
+    classification_list: List[ClassificationData]
+
+
 class NaiveBayes:
     regex = re.compile(r'\W+')
     _ADD_ALPHA_SMOOTHING: int
@@ -29,9 +35,10 @@ class NaiveBayes:
     document_frequency = defaultdict(int)
     negative_class: DocumentClass
     positive_class: DocumentClass
-    test_results: List[ClassificationData]
+    test_results: ClassificationDTO
 
     def __init__(self, add_alpha_smoothing: int = 1, words_to_ignore: List[str] = None):
+        """words_to_ignore are removed from the comments in the pre processing stage"""
         self.filters = words_to_ignore
         self._ADD_ALPHA_SMOOTHING = add_alpha_smoothing
 
@@ -46,11 +53,14 @@ class NaiveBayes:
         return results
 
     def preprocess_data(self, documents: List[str]):
+        """yield unfiltered alphanumeric comment for comment integrity and readability when returning comment,
+        and filtered alphanumeric comment for calculating the log likelihood"""
         for comment in documents:
+            lowercase_comment = comment.lower()
             if self.filters:
                 for string in self.filters:
-                    comment = comment.replace(string, "")
-            yield self.regex.sub(' ', comment).lower().strip()
+                    lowercase_comment = lowercase_comment.replace(string.lower(), "")
+            yield self.regex.sub(' ', comment).strip(), self.regex.sub(' ', lowercase_comment).strip()
 
     def calculate_word_weights(self, documents: List[str], df, tf_mode: Mode):
         """Used to calculate word weights. tf_mode is the weighting scheme used on the frequency term.
@@ -58,7 +68,7 @@ class NaiveBayes:
         To use term frequency (raw count divided by words in document), pass in 'frequency'
         See: https://en.wikipedia.org/wiki/Tf%E2%80%93idf (tf weighting schemes: raw count, term frequency)"""
         tf = defaultdict(int)
-        for comment in self.preprocess_data(documents):
+        for original_comment, comment in self.preprocess_data(documents):
             local_tf = defaultdict(int)
             words = comment.split()
             for word in words:
@@ -108,21 +118,27 @@ class NaiveBayes:
         self.calculate_log_likelihood()
         logger.debug("Successfully trained classifier.")
 
-    def test(self, documents):
-        results = []
+    def test(self, documents) -> ClassificationDTO:
+        classification_data = ClassificationDTO(classification_list=[])
         logger.info(f"Testing {len(documents)} documents.")
         with futures.ThreadPoolExecutor() as executor:
             future_list = []
-            for comment in self.preprocess_data(documents):
-                future_list.append(executor.submit(self.classify_document, comment))
+            for original_comment, comment in self.preprocess_data(documents):
+                future_list.append(executor.submit(self.classify_document, original_comment, comment))
             for future in futures.as_completed(future_list):
                 classification = future.result()
-                results.append(classification)
-        self.test_results = results
-        logger.debug(f"Successfully classified Data.")
-        return results
+                classification_data.classification_list.append(classification)
+                if classification.classification == 1:
+                    classification_data.positive_count += 1
+                elif classification.classification == 0:
+                    classification_data.negative_count += 1
+        self.test_results = classification_data
+        logger.debug(
+            f"Successfully classified Data. Positive count: {classification_data.positive_count}, "
+            f"negative count: {classification_data.negative_count}")
+        return classification_data
 
-    def classify_document(self, comment):
+    def classify_document(self, original_comment: str, comment: str) -> ClassificationData:
         pos_log_likelihood = self.positive_class.prior
         neg_log_likelihood = self.negative_class.prior
         for word in comment.split():
@@ -131,12 +147,12 @@ class NaiveBayes:
                 neg_log_likelihood += self.negative_class.log_likelihood[word]
         # if likelihoods are equal, consider it positive sentiment
         if pos_log_likelihood >= neg_log_likelihood:
-            return ClassificationData(comment=comment, classification=1)
+            return ClassificationData(comment=original_comment, classification=1)
         else:
-            return ClassificationData(comment=comment, classification=0)
+            return ClassificationData(comment=original_comment, classification=0)
 
     def convert_to_list(self) -> List[List]:
         results = []
-        for result in self.test_results:
+        for result in self.test_results.classification_list:
             results.append([result.comment, result.classification])
         return results
