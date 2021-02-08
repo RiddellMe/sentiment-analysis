@@ -38,13 +38,12 @@ class NaiveBayes:
     negative_class: DocumentClass
     positive_class: DocumentClass
     test_results: ClassificationDTO
-    lemmatizer = nltk.WordNetLemmatizer()
 
     def __init__(self, add_alpha_smoothing: int = 1, words_to_ignore: List[str] = None):
         """words_to_ignore are removed from the comments in the pre processing stage"""
+        self.stemmer = nltk.PorterStemmer()
         self.filters = words_to_ignore
         self._ADD_ALPHA_SMOOTHING = add_alpha_smoothing
-        nltk.download('wordnet')  # wordnet is used for lemmatizing words
 
     class Mode(Enum):
         COUNT = "count"
@@ -66,12 +65,12 @@ class NaiveBayes:
             if self.filters:
                 for string in self.filters:
                     processed_comment = processed_comment.replace(string.lower(), "")
-            # split comment into list of words, lemmatize words, convert numbers into string, convert back to comment
+            # split comment into list of words, stem words, convert numbers into string, convert back to comment
             word_list = processed_comment.split(' ')
             for i, word in enumerate(word_list):
                 if word.isdigit():
                     word_list[i] = num2words(word)
-            processed_comment = ' '.join([self.lemmatizer.lemmatize(word) for word in word_list])
+            processed_comment = ' '.join([self.stemmer.stem(word) for word in word_list])
             yield self.regex.sub(' ', comment).strip(), self.regex.sub(' ', processed_comment).strip()
 
     def calculate_word_weights(self, documents: List[str], df, tf_mode: Mode):

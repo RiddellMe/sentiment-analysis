@@ -42,16 +42,16 @@ def classification_data():
                          classification=0)]
 
     test_data = ["GME sucks. sell it at open. short interest is DOWN", "GME is going to the MOON. HOLD!",
-                 "short sell that crap", "i bought another 100 at open. BUY",
-                 "likely to hate yourself if you buy now..."]
+                 "short sell that gme  crap", "i bought another 100 gme at open. BUY",
+                 "likely to hate yourself if you buy gme now..."]
 
-    expected_output = [ClassificationData(comment='sucks sell it at open short interest is down', classification=0),
-                       ClassificationData(comment='is going to the moon hold', classification=1),
-                       ClassificationData(comment='short sell that crap', classification=0),
-                       ClassificationData(comment='i bought another 100 at open buy', classification=1),
-                       ClassificationData(comment='likely to hate yourself if you buy now', classification=0)]
+    expected_output = [ClassificationData(comment='gme sucks sell it at open short interest is down', classification=0),
+                       ClassificationData(comment='gme is going to the moon hold', classification=1),
+                       ClassificationData(comment='short sell that gme crap', classification=0),
+                       ClassificationData(comment='i bought another 100 gme at open buy', classification=1),
+                       ClassificationData(comment='likely to hate yourself if you buy gme now', classification=0)]
 
-    result_list = [['is going to the moon hold', 1],
-                   ['sucks sell it at open short interest is down', 0], ['short sell that crap', 0],
-                   ['i bought another 100 at open buy', 1], ['likely to hate yourself if you buy now', 0]]
+    result_list = [['gme is going to the moon hold', 1],
+                   ['gme sucks sell it at open short interest is down', 0], ['short sell that gme crap', 0],
+                   ['i bought another 100 gme at open buy', 1], ['likely to hate yourself if you buy gme now', 0]]
     return ticker, training_data, test_data, expected_output, result_list
