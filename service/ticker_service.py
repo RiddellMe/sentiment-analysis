@@ -8,8 +8,8 @@ from typing import Dict, List, Optional
 from urllib import request
 
 import requests
+from pydantic import BaseModel
 
-from models import AggregateTickerData, TickerDataDTO
 from util.timer import Timer
 
 _PUSHSHIFT_COMMENT_API = "https://api.pushshift.io/reddit/search/comment/"
@@ -27,6 +27,18 @@ _THREAD_COUNT = 2
 _SECONDS_TO_SLEEP_BEFORE_NEW_REQUEST = 3
 
 logger = logging.getLogger(__name__)
+
+
+class AggregateTickerData(BaseModel):
+    ticker: str
+    count: int
+    failed_during_fetch: bool = False
+
+
+class TickerDataDTO(BaseModel):
+    aggregate_data: List[AggregateTickerData]
+    from_date: datetime
+    to_date: datetime
 
 
 def aggregate_ticker_comment_count(ticker_list: List[str], days_to_look_back: int = 1, subreddit_to_search: str = None,
@@ -152,7 +164,7 @@ def sort_aggregate_data_by_count(data: List[AggregateTickerData]):
 
 
 def get_ticker_comments(ticker: str, days_to_look_back: int = 1, subreddit_to_search: str = None,
-                        end_datetime: datetime = datetime.utcnow()):
+                        end_datetime: datetime = datetime.utcnow()) -> List[str]:
     timer = Timer()
     timer.start()
     start_datetime, end_datetime = get_start_and_end_date(end_datetime, days_to_look_back)

@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from models import AggregateTickerData, TickerDataDTO
 from classifier.naive_bayes import ClassificationData
+from service.ticker_service import AggregateTickerData, TickerDataDTO
 
 
 @pytest.fixture
@@ -30,6 +30,7 @@ def ticker_return_data(ticker_aggregate_data_list):
 
 @pytest.fixture
 def classification_data():
+    ticker = "GME"
     training_data = [ClassificationData(comment="I love GME.buy and hold! TO THE MOON", classification=1),
                      ClassificationData(comment="BUY GME   ON OPEN. hold the line", classification=1),
                      ClassificationData(comment="gme order to buy 500 at open. already bought 200 yesterday",
@@ -44,11 +45,13 @@ def classification_data():
                  "short sell that crap", "i bought another 100 at open. BUY",
                  "likely to hate yourself if you buy now..."]
 
-    expected_output = [ClassificationData(comment='gme sucks sell it at open short interest is down', classification=0),
-                       ClassificationData(comment='gme is going to the moon hold ', classification=1),
+    expected_output = [ClassificationData(comment='sucks sell it at open short interest is down', classification=0),
+                       ClassificationData(comment='is going to the moon hold', classification=1),
                        ClassificationData(comment='short sell that crap', classification=0),
                        ClassificationData(comment='i bought another 100 at open buy', classification=1),
-                       ClassificationData(comment='likely to hate yourself if you buy now ', classification=0)]
+                       ClassificationData(comment='likely to hate yourself if you buy now', classification=0)]
 
-    result_list = [['comment', 'classification'], ['gme is going to the moon hold ', 1], ['gme sucks sell it at open short interest is down', 0], ['short sell that crap', 0], ['i bought another 100 at open buy', 1], ['likely to hate yourself if you buy now ', 0]]
-    return training_data, test_data, expected_output, result_list
+    result_list = [['is going to the moon hold', 1],
+                   ['sucks sell it at open short interest is down', 0], ['short sell that crap', 0],
+                   ['i bought another 100 at open buy', 1], ['likely to hate yourself if you buy now', 0]]
+    return ticker, training_data, test_data, expected_output, result_list

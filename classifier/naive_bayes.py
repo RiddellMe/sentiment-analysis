@@ -31,16 +31,26 @@ class NaiveBayes:
     positive_class: DocumentClass
     test_results: List[ClassificationData]
 
-    def __init__(self, add_alpha_smoothing: int = 1):
+    def __init__(self, add_alpha_smoothing: int = 1, words_to_ignore: List[str] = None):
+        self.filters = words_to_ignore
         self._ADD_ALPHA_SMOOTHING = add_alpha_smoothing
 
     class Mode(Enum):
         COUNT = "count"
         FREQ = "frequency"
 
+    def convert_from_list(self, data: List[List]) -> List[ClassificationData]:
+        results = []
+        for raw_data in data:
+            results.append(ClassificationData(comment=raw_data[0], classification=int(raw_data[1])))
+        return results
+
     def preprocess_data(self, documents: List[str]):
         for comment in documents:
-            yield self.regex.sub(' ', comment).lower()
+            if self.filters:
+                for string in self.filters:
+                    comment = comment.replace(string, "")
+            yield self.regex.sub(' ', comment).lower().strip()
 
     def calculate_word_weights(self, documents: List[str], df, tf_mode: Mode):
         """Used to calculate word weights. tf_mode is the weighting scheme used on the frequency term.
@@ -96,8 +106,7 @@ class NaiveBayes:
         self.positive_class = DocumentClass(prior=num_pos_docs / num_docs, word_frequency=pos_freq)
         self.negative_class = DocumentClass(prior=num_neg_docs / num_docs, word_frequency=neg_freq)
         self.calculate_log_likelihood()
-        logger.debug(f"Positive Class:\n{self.positive_class}\n"
-                     f"Negative Class:\n{self.negative_class}")
+        logger.debug("Successfully trained classifier.")
 
     def test(self, documents):
         results = []
@@ -110,7 +119,7 @@ class NaiveBayes:
                 classification = future.result()
                 results.append(classification)
         self.test_results = results
-        logger.debug(f"Classified Data:\n{results}")
+        logger.debug(f"Successfully classified Data.")
         return results
 
     def classify_document(self, comment):
@@ -126,10 +135,8 @@ class NaiveBayes:
         else:
             return ClassificationData(comment=comment, classification=0)
 
-    def convert_to_list(self):
+    def convert_to_list(self) -> List[List]:
         results = []
-        header = list(ClassificationData.__fields__.keys())
-        results.append(header)
         for result in self.test_results:
             results.append([result.comment, result.classification])
         return results
